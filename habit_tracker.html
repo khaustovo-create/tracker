@@ -44,6 +44,9 @@ input,select,textarea{font-family:var(--font);font-size:15px;outline:none}
 .habit-sidebar-item:hover,.habit-sidebar-item.selected{background:var(--accent-light)}
 .habit-sidebar-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
 .habit-sidebar-name{font-size:14px;color:var(--text);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.habit-edit-btn{width:22px;height:22px;border-radius:var(--radius-sm);background:transparent;border:none;color:var(--text3);font-size:13px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0;transition:opacity .15s;flex-shrink:0}
+.habit-sidebar-item:hover .habit-edit-btn{opacity:1}
+.habit-edit-btn:hover{background:var(--bg3);color:var(--text)}
 .add-btn{width:100%;padding:8px;border-radius:var(--radius-sm);background:transparent;color:var(--accent);font-size:14px;font-weight:500;text-align:left;display:flex;align-items:center;gap:6px;transition:background .12s}
 .add-btn:hover{background:var(--accent-light)}
 .add-btn-icon{width:18px;height:18px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
@@ -271,7 +274,7 @@ function renderSidebar(){
   html+=`<div class="sidebar-section"><div class="sidebar-label">Привычки</div>`;
   filtered.forEach(h=>{
     const color=getHabitColor(h);
-    html+=`<div class="habit-sidebar-item ${state.selectedHabitId===h.id?'selected':''}" onclick="selectHabit('${h.id}')"><div class="habit-sidebar-dot" style="background:${color}"></div><span class="habit-sidebar-name">${esc(h.name)}</span></div>`;
+    html+=`<div class="habit-sidebar-item ${state.selectedHabitId===h.id?'selected':''}" onclick="selectHabit('${h.id}')"><div class="habit-sidebar-dot" style="background:${color}"></div><span class="habit-sidebar-name">${esc(h.name)}</span><button class="habit-edit-btn" onclick="event.stopPropagation();openEditHabit('${h.id}')" title="Редактировать привычку">✎</button></div>`;
   });
   html+=`<button class="add-btn" onclick="openAddHabit()"><div class="add-btn-icon">+</div>Привычка</button>`;
   html+=`</div>`;
@@ -921,6 +924,70 @@ function exportExcel(){
   });
   const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='habits.csv';a.click();
+}
+
+// ---- Edit / Delete Habit ----
+function openEditHabit(hid){
+  const h=getHabit(hid);if(!h)return;
+  const mr=document.getElementById('modal-root');
+  mr.innerHTML=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-header"><span class="modal-title">Редактировать привычку</span><button class="modal-close" onclick="closeModal()">✕</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Название</label><input class="form-input" id="eh-name" value="${esc(h.name)}" placeholder="Название привычки"></div>
+      <div class="form-group"><label class="form-label">Категория</label>
+        <select class="form-select" id="eh-cat">
+          <option value="">Без категории</option>
+          ${state.categories.map(c=>`<option value="${c.id}" ${h.catId===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Тип</label>
+        <div class="type-grid">
+          <div class="type-btn ${h.type==='bool'?'active':''}" onclick="pickType(this)" data-type="bool">Да / нет</div>
+          <div class="type-btn ${h.type==='count'?'active':''}" onclick="pickType(this)" data-type="count">Количество</div>
+          <div class="type-btn ${h.type==='measure'?'active':''}" onclick="pickType(this)" data-type="measure">Измеримое</div>
+        </div>
+      </div>
+      <button class="btn-primary" onclick="saveEditHabit('${hid}')">Сохранить изменения</button>
+      <button class="btn-secondary" style="margin-top:8px;color:var(--red);background:transparent;border:1.5px solid var(--red)" onclick="deleteHabitPrompt('${hid}')">🗑 Удалить привычку</button>
+    </div>
+  </div></div>`;
+}
+
+function saveEditHabit(hid){
+  const h=getHabit(hid);if(!h)return;
+  const name=document.getElementById('eh-name').value.trim();
+  if(!name)return;
+  const catId=document.getElementById('eh-cat').value||null;
+  const typeEl=document.querySelector('.type-btn.active');
+  const type=typeEl?typeEl.dataset.type:h.type;
+  h.name=name;h.catId=catId;h.type=type;
+  save();closeModal();render();
+}
+
+function deleteHabitPrompt(hid){
+  const h=getHabit(hid);if(!h)return;
+  const cnt=state.entries.filter(e=>e.habitId===hid).length;
+  const mr=document.getElementById('modal-root');
+  mr.innerHTML=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-header"><span class="modal-title">Удалить привычку?</span><button class="modal-close" onclick="openEditHabit('${hid}')">✕</button></div>
+    <div class="modal-body">
+      <p style="font-size:15px;font-weight:500;margin-bottom:8px">«${esc(h.name)}»</p>
+      ${cnt>0
+        ?`<p style="font-size:13px;color:var(--text2);margin-bottom:20px">Вместе с привычкой будет удалено <strong>${cnt}</strong> отметок. Отменить это действие невозможно.</p>`
+        :`<p style="font-size:13px;color:var(--text3);margin-bottom:20px">У этой привычки нет отметок.</p>`}
+      <button class="btn-primary" style="background:var(--red)" onclick="deleteHabit('${hid}')">Да, удалить</button>
+      <button class="btn-secondary" onclick="openEditHabit('${hid}')">Отмена</button>
+    </div>
+  </div></div>`;
+}
+
+function deleteHabit(hid){
+  state.habits=state.habits.filter(h=>h.id!==hid);
+  state.entries=state.entries.filter(e=>e.habitId!==hid);
+  if(state.selectedHabitId===hid) state.selectedHabitId=state.habits.length?state.habits[0].id:null;
+  save();closeModal();render();
 }
 
 // ---- Init ----
