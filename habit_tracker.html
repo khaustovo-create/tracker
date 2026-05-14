@@ -1,0 +1,930 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Привычки</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#ffffff;--bg2:#f5f5f7;--bg3:#e8e8ed;
+  --text:#1d1d1f;--text2:#6e6e73;--text3:#aeaeb2;
+  --border:#d2d2d7;--border2:#e5e5ea;
+  --accent:#007aff;--accent-light:#e8f0fe;
+  --green:#34c759;--green-light:#e9f8ee;--green-mid:#1a9e3e;
+  --red:#ff3b30;--radius:12px;--radius-sm:8px;
+  --shadow:0 2px 12px rgba(0,0,0,0.08);
+  --font:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',sans-serif;
+}
+body{font-family:var(--font);background:var(--bg2);color:var(--text);min-height:100vh;font-size:15px;line-height:1.5}
+button{font-family:var(--font);cursor:pointer;border:none;outline:none}
+input,select,textarea{font-family:var(--font);font-size:15px;outline:none}
+
+/* Layout */
+.app{display:grid;grid-template-columns:260px 1fr;grid-template-rows:56px 1fr;min-height:100vh}
+.topbar{grid-column:1/-1;background:rgba(255,255,255,0.85);backdrop-filter:blur(20px);border-bottom:1px solid var(--border2);display:flex;align-items:center;padding:0 24px;gap:16px;position:sticky;top:0;z-index:100}
+.topbar h1{font-size:17px;font-weight:600;color:var(--text);flex:1}
+.topbar-nav{display:flex;gap:4px}
+.nav-btn{padding:6px 14px;border-radius:20px;font-size:13px;font-weight:500;background:transparent;color:var(--text2);transition:all .15s}
+.nav-btn.active{background:var(--text);color:#fff}
+.nav-btn:hover:not(.active){background:var(--bg3)}
+.sidebar{background:var(--bg);border-right:1px solid var(--border2);padding:20px 16px;overflow-y:auto}
+.main{padding:24px;overflow-y:auto}
+
+/* Sidebar */
+.sidebar-section{margin-bottom:24px}
+.sidebar-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:10px;padding:0 8px}
+.cat-item{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:var(--radius-sm);cursor:pointer;transition:background .12s}
+.cat-item:hover,.cat-item.active{background:var(--bg2)}
+.cat-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.cat-name{font-size:14px;flex:1;color:var(--text)}
+.cat-count{font-size:12px;color:var(--text3)}
+.habit-sidebar-item{display:flex;align-items:center;gap:8px;padding:8px;border-radius:var(--radius-sm);cursor:pointer;transition:background .12s;margin-bottom:2px}
+.habit-sidebar-item:hover,.habit-sidebar-item.selected{background:var(--accent-light)}
+.habit-sidebar-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.habit-sidebar-name{font-size:14px;color:var(--text);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.add-btn{width:100%;padding:8px;border-radius:var(--radius-sm);background:transparent;color:var(--accent);font-size:14px;font-weight:500;text-align:left;display:flex;align-items:center;gap:6px;transition:background .12s}
+.add-btn:hover{background:var(--accent-light)}
+.add-btn-icon{width:18px;height:18px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
+
+/* Cards */
+.card{background:var(--bg);border-radius:var(--radius);border:1px solid var(--border2);padding:20px;margin-bottom:16px}
+.card-title{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text2);margin-bottom:16px}
+
+/* Calendar */
+.cal-header{display:flex;align-items:center;margin-bottom:16px}
+.cal-header h2{font-size:17px;font-weight:600;flex:1;text-transform:capitalize}
+.cal-nav{background:none;color:var(--text2);font-size:20px;padding:0 8px;line-height:1;border-radius:var(--radius-sm);transition:background .12s}
+.cal-nav:hover{background:var(--bg2)}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.cal-day-name{text-align:center;font-size:11px;font-weight:600;color:var(--text3);padding:4px 0;text-transform:uppercase;letter-spacing:.04em}
+.cal-cell{aspect-ratio:1;border-radius:var(--radius-sm);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;position:relative;transition:all .12s;font-size:13px}
+.cal-cell:hover{background:var(--bg2)}
+.cal-cell.other-month{color:var(--text3)}
+.cal-cell.today .cal-date{background:var(--accent);color:#fff;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center}
+.cal-cell.done{background:var(--green-light)}
+.cal-cell.done-multi{background:#c8f0d4}
+.cal-cell.selected{outline:2px solid var(--accent);outline-offset:-2px}
+.cal-dot{width:5px;height:5px;border-radius:50%;margin-top:2px}
+.cal-date{font-size:13px;font-weight:500;line-height:1}
+
+/* Habit list */
+.habit-list-grid{display:flex;flex-direction:column;gap:8px}
+.habit-row{background:var(--bg);border:1px solid var(--border2);border-radius:var(--radius);padding:14px 16px;display:flex;align-items:center;gap:12px;cursor:pointer;transition:all .15s}
+.habit-row:hover{border-color:var(--border);box-shadow:var(--shadow)}
+.habit-row.selected{border-color:var(--accent)}
+.habit-color{width:12px;height:12px;border-radius:3px;flex-shrink:0}
+.habit-info{flex:1;min-width:0}
+.habit-name{font-size:15px;font-weight:500;color:var(--text)}
+.habit-meta{font-size:12px;color:var(--text3);margin-top:2px}
+.habit-streak{text-align:right}
+.streak-num{font-size:20px;font-weight:700;color:var(--text);line-height:1}
+.streak-label{font-size:11px;color:var(--text3)}
+.check-today{width:34px;height:34px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s;background:transparent;font-size:15px;color:transparent}
+.check-today.done{background:var(--green);border-color:var(--green);color:#fff}
+.check-today:hover:not(.done){background:var(--green-light);border-color:var(--green)}
+
+/* Stat cards */
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+.stat-card{background:var(--bg2);border-radius:var(--radius-sm);padding:14px;text-align:center}
+.stat-val{font-size:22px;font-weight:700;color:var(--text);line-height:1.1}
+.stat-lbl{font-size:11px;color:var(--text3);margin-top:4px}
+.stat-sub{font-size:12px;color:var(--green-mid);margin-top:2px}
+
+/* Modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px}
+.modal{background:var(--bg);border-radius:16px;width:100%;max-width:480px;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.2)}
+.modal-header{padding:20px 20px 0;display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.modal-title{font-size:17px;font-weight:600}
+.modal-close{width:28px;height:28px;border-radius:50%;background:var(--bg3);color:var(--text2);font-size:16px;display:flex;align-items:center;justify-content:center;cursor:pointer;border:none;flex-shrink:0}
+.modal-body{padding:0 20px 20px}
+.form-group{margin-bottom:16px}
+.form-label{font-size:13px;font-weight:500;color:var(--text2);margin-bottom:6px;display:block}
+.form-input{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:15px;color:var(--text);background:var(--bg);transition:border .12s}
+.form-input:focus{border-color:var(--accent)}
+.form-select{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:15px;color:var(--text);background:var(--bg);appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23aeaeb2' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
+.type-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.type-btn{padding:10px;border-radius:var(--radius-sm);border:1.5px solid var(--border2);background:var(--bg);color:var(--text2);font-size:13px;font-weight:500;text-align:center;cursor:pointer;transition:all .12s}
+.type-btn.active{border-color:var(--accent);background:var(--accent-light);color:var(--accent)}
+.color-grid{display:flex;gap:8px;flex-wrap:wrap}
+.color-swatch{width:28px;height:28px;border-radius:50%;cursor:pointer;transition:transform .12s;border:3px solid transparent}
+.color-swatch.active{border-color:var(--text);transform:scale(1.1)}
+.btn-primary{width:100%;padding:12px;border-radius:var(--radius-sm);background:var(--accent);color:#fff;font-size:15px;font-weight:600;cursor:pointer;border:none;transition:opacity .12s;margin-top:4px}
+.btn-primary:hover{opacity:.85}
+.btn-secondary{width:100%;padding:12px;border-radius:var(--radius-sm);background:var(--bg2);color:var(--text);font-size:15px;font-weight:500;cursor:pointer;border:none;margin-top:8px}
+.btn-danger{background:var(--red);color:#fff;padding:8px 14px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;cursor:pointer;border:none}
+.day-entry{background:var(--bg2);border-radius:var(--radius-sm);padding:12px;margin-bottom:8px;position:relative}
+.day-entry-top{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.day-entry-val{font-size:14px;font-weight:600;color:var(--text)}
+.day-entry-comment{font-size:13px;color:var(--text2)}
+.day-entry-time{font-size:11px;color:var(--text3);flex:1}
+.day-entry-actions{display:flex;gap:6px}
+.icon-btn{width:26px;height:26px;border-radius:var(--radius-sm);background:var(--bg);border:1px solid var(--border2);color:var(--text2);font-size:13px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.icon-btn:hover{background:var(--bg3)}
+
+/* Chart area */
+.chart-wrap{position:relative;height:160px}
+
+/* Today section */
+.today-header{font-size:22px;font-weight:700;margin-bottom:4px}
+.today-sub{font-size:14px;color:var(--text2);margin-bottom:20px}
+
+/* Tabs */
+.tabs{display:flex;gap:2px;background:var(--bg2);padding:3px;border-radius:10px;margin-bottom:20px;align-self:flex-start}
+.tab{padding:6px 16px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;color:var(--text2);transition:all .12s;border:none;background:transparent}
+.tab.active{background:var(--bg);color:var(--text);box-shadow:0 1px 4px rgba(0,0,0,0.1)}
+
+/* Empty state */
+.empty{text-align:center;padding:48px 24px;color:var(--text3)}
+.empty-icon{font-size:36px;margin-bottom:12px}
+.empty-text{font-size:15px;font-weight:500;color:var(--text2)}
+.empty-sub{font-size:13px;margin-top:4px}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+/* Chart section tabs */
+.period-tabs{display:flex;gap:8px;margin-bottom:16px}
+.period-tab{padding:5px 12px;border-radius:20px;font-size:12px;font-weight:500;cursor:pointer;background:var(--bg2);color:var(--text2);border:none;transition:all .12s}
+.period-tab.active{background:var(--accent);color:#fff}
+
+@media(max-width:700px){
+  .app{grid-template-columns:1fr}
+  .sidebar{display:none}
+  .stat-grid{grid-template-columns:repeat(2,1fr)}
+  .main{padding:16px}
+}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="topbar">
+    <h1>Привычки</h1>
+    <div class="topbar-nav">
+      <button class="nav-btn active" onclick="showView('today')">Сегодня</button>
+      <button class="nav-btn" onclick="showView('calendar')">Календарь</button>
+      <button class="nav-btn" onclick="showView('stats')">Статистика</button>
+    </div>
+    <button class="nav-btn" onclick="exportExcel()" style="margin-left:8px">↓ Excel</button>
+  </div>
+  <div class="sidebar" id="sidebar"></div>
+  <div class="main" id="main"></div>
+</div>
+
+<div id="modal-root"></div>
+
+<script>
+const COLORS = ['#007aff','#34c759','#ff9500','#ff3b30','#af52de','#ff2d55','#5ac8fa','#ffcc00','#4cd964','#5856d6'];
+const TYPE_LABELS = {bool:'Да / нет',count:'Количество',measure:'Вес / объём / расстояние'};
+const TYPE_UNITS = {bool:'',count:'раз',measure:'ед.'};
+
+let state = {
+  habits:[],
+  categories:[],
+  entries:[],
+  selectedHabitId:null,
+  calMonth: new Date().getMonth(),
+  calYear: new Date().getFullYear(),
+  activeView:'today',
+  statPeriod:'month',
+  filterCat:'all'
+};
+
+function save(){localStorage.setItem('habits_app',JSON.stringify(state))}
+function load(){
+  const d=localStorage.getItem('habits_app');
+  if(d){const p=JSON.parse(d);Object.assign(state,p)}
+  else initDemo();
+}
+
+function initDemo(){
+  state.categories=[
+    {id:'c1',name:'Здоровье',color:'#34c759'},
+    {id:'c2',name:'Спорт',color:'#007aff'},
+    {id:'c3',name:'Питание',color:'#ff9500'},
+  ];
+  state.habits=[
+    {id:'h1',name:'Сон 7+ часов',catId:'c1',type:'bool'},
+    {id:'h2',name:'Пробежка',catId:'c2',type:'measure'},
+    {id:'h3',name:'Выпил 2л воды',catId:'c1',type:'count'},
+    {id:'h4',name:'Без сладкого',catId:'c3',type:'bool'},
+    {id:'h5',name:'Чтение',catId:null,type:'count'},
+  ];
+  const today=new Date();
+  const entries=[];
+  for(let i=0;i<30;i++){
+    const d=new Date(today);d.setDate(d.getDate()-i);
+    const ds=fmtDate(d);
+    if(Math.random()>.35) entries.push({id:'e'+i+'a',habitId:'h1',date:ds,value:null,comment:''});
+    if(Math.random()>.5) entries.push({id:'e'+i+'b',habitId:'h2',date:ds,value:+(3+Math.random()*7).toFixed(1),comment:''});
+    if(Math.random()>.4){
+      entries.push({id:'e'+i+'c',habitId:'h3',date:ds,value:Math.floor(1+Math.random()*3),comment:''});
+      if(Math.random()>.6) entries.push({id:'e'+i+'c2',habitId:'h3',date:ds,value:1,comment:'После обеда'});
+    }
+    if(Math.random()>.45) entries.push({id:'e'+i+'d',habitId:'h4',date:ds,value:null,comment:''});
+    if(Math.random()>.5) entries.push({id:'e'+i+'e',habitId:'h5',date:ds,value:Math.floor(10+Math.random()*50),comment:''});
+  }
+  state.entries=entries;
+  state.selectedHabitId='h1';
+  save();
+}
+
+function fmtDate(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function todayStr(){return fmtDate(new Date())}
+function uid(){return Math.random().toString(36).slice(2)+Date.now().toString(36)}
+
+function getHabit(id){return state.habits.find(h=>h.id===id)}
+function getCat(id){return state.categories.find(c=>c.id===id)}
+function getEntriesForHabitDay(hid,date){return state.entries.filter(e=>e.habitId===hid&&e.date===date)}
+function isDone(hid,date){return getEntriesForHabitDay(hid,date).length>0}
+function getHabitColor(h){const c=getCat(h.catId);return c?c.color:'#aeaeb2'}
+
+// ---- Render ----
+function render(){
+  renderSidebar();
+  if(state.activeView==='today') renderToday();
+  else if(state.activeView==='calendar') renderCalendar();
+  else if(state.activeView==='stats') renderStats();
+}
+
+function renderSidebar(){
+  const sb=document.getElementById('sidebar');
+  let html='';
+  // Categories filter
+  html+=`<div class="sidebar-section"><div class="sidebar-label">Категории</div>`;
+  html+=`<div class="cat-item ${state.filterCat==='all'?'active':''}" onclick="setFilter('all')"><div class="cat-dot" style="background:var(--border)"></div><span class="cat-name">Все</span><span class="cat-count">${state.habits.length}</span></div>`;
+  state.categories.forEach(c=>{
+    const cnt=state.habits.filter(h=>h.catId===c.id).length;
+    html+=`<div class="cat-item ${state.filterCat===c.id?'active':''}" onclick="setFilter('${c.id}')"><div class="cat-dot" style="background:${c.color}"></div><span class="cat-name">${esc(c.name)}</span><span class="cat-count">${cnt}</span></div>`;
+  });
+  html+=`<button class="add-btn" onclick="openAddCategory()"><div class="add-btn-icon">+</div>Категория</button>`;
+  html+=`</div>`;
+  // Edit categories button
+  if(state.categories.length>0){
+    html+=`<div style="padding:0 8px 8px"><button class="add-btn" style="color:var(--text3)" onclick="openEditCategories()"><span style="font-size:13px">✎</span> Редактировать</button></div>`;
+  }
+  // Habits
+  const filtered=state.filterCat==='all'?state.habits:state.habits.filter(h=>h.catId===state.filterCat);
+  html+=`<div class="sidebar-section"><div class="sidebar-label">Привычки</div>`;
+  filtered.forEach(h=>{
+    const color=getHabitColor(h);
+    html+=`<div class="habit-sidebar-item ${state.selectedHabitId===h.id?'selected':''}" onclick="selectHabit('${h.id}')"><div class="habit-sidebar-dot" style="background:${color}"></div><span class="habit-sidebar-name">${esc(h.name)}</span></div>`;
+  });
+  html+=`<button class="add-btn" onclick="openAddHabit()"><div class="add-btn-icon">+</div>Привычка</button>`;
+  html+=`</div>`;
+  // Coming soon
+  html+=`<div class="sidebar-section" style="opacity:.4"><div class="sidebar-label">Скоро</div><div style="padding:8px;font-size:13px;color:var(--text3)">🎯 Цели</div><div style="padding:8px;font-size:13px;color:var(--text3)">🔔 Напоминания</div></div>`;
+  // Danger zone
+  html+=`<div class="sidebar-section" style="margin-top:auto;padding-top:16px;border-top:1px solid var(--border2)">`;
+  html+=`<button class="add-btn" style="color:var(--red)" onclick="confirmClearAll()"><span style="font-size:14px">⊘</span> Очистить все данные</button>`;
+  html+=`</div>`;
+  sb.innerHTML=html;
+}
+
+function renderToday(){
+  const m=document.getElementById('main');
+  const today=todayStr();
+  const d=new Date();
+  const days=['воскресенье','понедельник','вторник','среда','четверг','пятница','суббота'];
+  const months=['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+  const filtered=state.filterCat==='all'?state.habits:state.habits.filter(h=>h.catId===state.filterCat);
+  const doneToday=filtered.filter(h=>isDone(h.id,today)).length;
+
+  let html=`<div class="today-header">${days[d.getDay()]}, ${d.getDate()} ${months[d.getMonth()]}</div>`;
+  html+=`<div class="today-sub">${doneToday} из ${filtered.length} привычек выполнено</div>`;
+
+  // Progress bar
+  const pct=filtered.length?Math.round(doneToday/filtered.length*100):0;
+  html+=`<div style="background:var(--bg3);border-radius:4px;height:4px;margin-bottom:24px"><div style="background:var(--green);height:4px;border-radius:4px;width:${pct}%;transition:width .4s"></div></div>`;
+
+  if(!filtered.length){
+    html+=`<div class="empty"><div class="empty-icon">✦</div><div class="empty-text">Нет привычек</div><div class="empty-sub">Добавьте первую привычку в боковом меню</div></div>`;
+  } else {
+    html+=`<div class="habit-list-grid">`;
+    filtered.forEach(h=>{
+      const done=isDone(h.id,today);
+      const color=getHabitColor(h);
+      const cat=getCat(h.catId);
+      const entries=getEntriesForHabitDay(h.id,today);
+      const totalVal=entries.reduce((s,e)=>s+(e.value||0),0);
+      let metaStr=TYPE_LABELS[h.type];
+      if(cat) metaStr+=` · ${cat.name}`;
+      let valStr='';
+      if(done && h.type!=='bool') valStr=`<span style="font-size:13px;color:var(--green-mid);font-weight:600;margin-left:8px">${totalVal} ${TYPE_UNITS[h.type]}</span>`;
+
+      // Streak calc
+      let streak=0;
+      const check=new Date();
+      if(!isDone(h.id,fmtDate(check))) check.setDate(check.getDate()-1);
+      while(isDone(h.id,fmtDate(check))){streak++;check.setDate(check.getDate()-1)}
+
+      html+=`<div class="habit-row ${state.selectedHabitId===h.id?'selected':''}" onclick="selectHabit('${h.id}')">
+        <div class="habit-color" style="background:${color};height:36px;width:4px;border-radius:2px"></div>
+        <div class="habit-info">
+          <div class="habit-name">${esc(h.name)}${valStr}</div>
+          <div class="habit-meta">${metaStr}</div>
+        </div>
+        <div class="habit-streak"><div class="streak-num">${streak}</div><div class="streak-label">подряд</div></div>
+        <button class="check-today ${done?'done':''}" onclick="event.stopPropagation();quickCheck('${h.id}')" title="${done?'Выполнено':'Отметить'}">${done?'✓':''}</button>
+      </div>`;
+    });
+    html+=`</div>`;
+  }
+
+  // Mini calendar for selected habit
+  if(state.selectedHabitId){
+    const h=getHabit(state.selectedHabitId);
+    if(h){
+      html+=`<div style="margin-top:24px">`;
+      html+=renderCalendarHTML(true);
+      html+=`</div>`;
+    }
+  }
+  m.innerHTML=html;
+}
+
+function renderCalendar(){
+  const m=document.getElementById('main');
+  m.innerHTML=renderCalendarHTML(false);
+}
+
+function renderCalendarHTML(mini){
+  const h=state.selectedHabitId?getHabit(state.selectedHabitId):null;
+  const year=state.calYear, month=state.calMonth;
+  const monthNames=['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+  const dayNames=['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+  const first=new Date(year,month,1);
+  let startDay=first.getDay()-1;if(startDay<0)startDay=6;
+  const daysInMonth=new Date(year,month+1,0).getDate();
+  const today=todayStr();
+  const color=h?getHabitColor(h):'var(--accent)';
+
+  let html=`<div class="card">`;
+  if(!mini){
+    // Habit selector in calendar view
+    html+=`<div style="margin-bottom:16px;display:flex;align-items:center;gap:12px">`;
+    html+=`<select class="form-select" style="flex:1" onchange="selectHabit(this.value)">`;
+    html+=`<option value="">— Все привычки</option>`;
+    state.habits.forEach(hh=>{html+=`<option value="${hh.id}" ${state.selectedHabitId===hh.id?'selected':''}>${esc(hh.name)}</option>`});
+    html+=`</select></div>`;
+  } else {
+    if(h) html+=`<div class="card-title" style="color:${color}">${esc(h.name)}</div>`;
+  }
+
+  html+=`<div class="cal-header">
+    <button class="cal-nav" onclick="changeMonth(-1)">‹</button>
+    <h2>${monthNames[month]} ${year}</h2>
+    <button class="cal-nav" onclick="changeMonth(1)">›</button>
+  </div>`;
+  html+=`<div class="cal-grid">`;
+  dayNames.forEach(d=>{html+=`<div class="cal-day-name">${d}</div>`});
+
+  // Empty cells before
+  for(let i=0;i<startDay;i++){
+    const prevDate=new Date(year,month,-(startDay-i-1));
+    html+=`<div class="cal-cell other-month"><span class="cal-date">${prevDate.getDate()}</span></div>`;
+  }
+
+  for(let day=1;day<=daysInMonth;day++){
+    const dateStr=`${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    const isToday=dateStr===today;
+
+    let doneClass='';let dotColor='transparent';let dotStyle='';
+    if(h){
+      const ents=getEntriesForHabitDay(h.id,dateStr);
+      if(ents.length===1){doneClass='done';dotColor=color}
+      else if(ents.length>1){doneClass='done-multi';dotColor=color}
+      dotStyle=`background:${dotColor};opacity:.7`;
+    } else {
+      // Show all habits color dots
+      const doneHabits=state.habits.filter(hh=>isDone(hh.id,dateStr));
+      if(doneHabits.length>0) doneClass='done';
+    }
+
+    html+=`<div class="cal-cell ${doneClass} ${isToday?'today':''}" onclick="openDay('${dateStr}')">
+      <span class="cal-date">${day}</span>
+      ${h?`<div class="cal-dot" style="${dotStyle}"></div>`:''}
+    </div>`;
+  }
+  html+=`</div></div>`;
+  return html;
+}
+
+function renderStats(){
+  const m=document.getElementById('main');
+  const h=state.selectedHabitId?getHabit(state.selectedHabitId):null;
+  const today=new Date();
+  const thisMonth=today.getMonth(), thisYear=today.getFullYear();
+  const lastMonth=thisMonth===0?11:thisMonth-1;
+  const lastMonthYear=thisMonth===0?thisYear-1:thisYear;
+
+  function daysInMonth(y,m){return new Date(y,m+1,0).getDate()}
+  function countDays(hid,y,mo){
+    let cnt=0;const dim=daysInMonth(y,mo);
+    for(let d=1;d<=dim;d++){
+      const ds=`${y}-${String(mo+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      if(isDone(hid,ds)) cnt++;
+    }
+    return cnt;
+  }
+  function sumPeriod(hid,y,mo){
+    let s=0;const dim=daysInMonth(y,mo);
+    for(let d=1;d<=dim;d++){
+      const ds=`${y}-${String(mo+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      getEntriesForHabitDay(hid,ds).forEach(e=>{s+=e.value||0});
+    }
+    return s;
+  }
+
+  let html=`<div class="card-title" style="margin-bottom:16px">Статистика${h?' — '+esc(h.name):''}</div>`;
+
+  // Habit selector
+  html+=`<select class="form-select" style="margin-bottom:20px" onchange="selectHabit(this.value)">
+    <option value="">— Выберите привычку</option>`;
+  state.habits.forEach(hh=>{html+=`<option value="${hh.id}" ${state.selectedHabitId===hh.id?'selected':''}>${esc(hh.name)}</option>`});
+  html+=`</select>`;
+
+  if(!h){
+    // Category breakdown
+    html+=`<div class="card"><div class="card-title">По категориям</div>`;
+    html+=`<div class="stat-grid" style="grid-template-columns:repeat(3,1fr)">`;
+    state.categories.forEach(c=>{
+      const habitsInCat=state.habits.filter(hh=>hh.catId===c.id);
+      const totalEntries=state.entries.filter(e=>habitsInCat.some(hh=>hh.id===e.habitId)&&e.date.startsWith(`${thisYear}-${String(thisMonth+1).padStart(2,'0')}`)).length;
+      html+=`<div class="stat-card"><div class="stat-val" style="color:${c.color}">${totalEntries}</div><div class="stat-lbl">${esc(c.name)}</div></div>`;
+    });
+    html+=`</div></div>`;
+    // All habits this month
+    html+=`<div class="card"><div class="card-title">Все привычки — этот месяц</div>`;
+    state.habits.forEach(hh=>{
+      const dim=daysInMonth(thisYear,thisMonth);
+      const days=countDays(hh.id,thisYear,thisMonth);
+      const pct=Math.round(days/dim*100);
+      const color=getHabitColor(hh);
+      html+=`<div style="margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+          <span style="font-size:14px;font-weight:500">${esc(hh.name)}</span>
+          <span style="font-size:13px;color:var(--text2)">${days} / ${dim} дн.</span>
+        </div>
+        <div style="background:var(--bg3);border-radius:4px;height:6px">
+          <div style="background:${color};height:6px;border-radius:4px;width:${pct}%"></div>
+        </div>
+      </div>`;
+    });
+    html+=`</div>`;
+    m.innerHTML=html;
+    return;
+  }
+
+  // Single habit stats
+  const thisMonthDays=countDays(h.id,thisYear,thisMonth);
+  const lastMonthDays=countDays(h.id,lastMonthYear,lastMonth);
+  const dim=daysInMonth(thisYear,thisMonth);
+  const totalEntries=state.entries.filter(e=>e.habitId===h.id).length;
+  const thisSum=sumPeriod(h.id,thisYear,thisMonth);
+  const lastSum=sumPeriod(h.id,lastMonthYear,lastMonth);
+  const avgPerDay=thisMonthDays>0&&h.type!=='bool'?(thisSum/thisMonthDays).toFixed(1):null;
+
+  html+=`<div class="stat-grid">
+    <div class="stat-card"><div class="stat-val">${thisMonthDays}</div><div class="stat-lbl">дней этот мес.</div>${lastMonthDays?`<div class="stat-sub">пред: ${lastMonthDays}</div>`:''}</div>
+    <div class="stat-card"><div class="stat-val">${Math.round(thisMonthDays/dim*100)}%</div><div class="stat-lbl">выполнение</div></div>
+    <div class="stat-card"><div class="stat-val">${totalEntries}</div><div class="stat-lbl">всего отметок</div></div>
+    ${h.type!=='bool'?`<div class="stat-card"><div class="stat-val">${thisSum}</div><div class="stat-lbl">сумма за мес.</div>${avgPerDay?`<div class="stat-sub">~${avgPerDay}/день</div>`:''}</div>`:'<div class="stat-card"><div class="stat-val">'+lastMonthDays+'</div><div class="stat-lbl">пред. месяц</div></div>'}
+  </div>`;
+
+  // Chart - last 30 days
+  html+=`<div class="card"><div class="card-title">Последние 30 дней</div><div class="chart-wrap"><canvas id="statsChart"></canvas></div></div>`;
+
+  // Week comparison
+  html+=`<div class="card"><div class="card-title">По неделям (последние 8 нед.)</div><div class="chart-wrap"><canvas id="weekChart"></canvas></div></div>`;
+
+  // Month comparison
+  html+=`<div class="card"><div class="card-title">Сравнение месяцев</div>`;
+  html+=`<div style="display:flex;flex-direction:column;gap:8px">`;
+  for(let i=0;i<3;i++){
+    let mo=(thisMonth-i+12)%12, yr=thisMonth-i<0?thisYear-1:thisYear;
+    if(thisMonth-i<0) yr=thisYear-1;
+    const mn=['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
+    const days=countDays(h.id,yr,mo);
+    const dim2=daysInMonth(yr,mo);
+    const pct=Math.round(days/dim2*100);
+    const color=i===0?getHabitColor(h):'var(--text3)';
+    html+=`<div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+        <span style="font-size:13px;color:var(--text2)">${mn[mo]} ${yr}</span>
+        <span style="font-size:13px;font-weight:500">${days} дн. (${pct}%)</span>
+      </div>
+      <div style="background:var(--bg3);border-radius:4px;height:8px">
+        <div style="background:${color};height:8px;border-radius:4px;width:${pct}%"></div>
+      </div>
+    </div>`;
+  }
+  html+=`</div></div>`;
+
+  m.innerHTML=html;
+
+  // Draw charts
+  setTimeout(()=>{
+    drawDailyChart(h);
+    drawWeekChart(h);
+  },50);
+}
+
+function drawDailyChart(h){
+  const ctx=document.getElementById('statsChart');
+  if(!ctx)return;
+  const labels=[],data=[],colors=[];
+  const color=getHabitColor(h);
+  for(let i=29;i>=0;i--){
+    const d=new Date();d.setDate(d.getDate()-i);
+    const ds=fmtDate(d);
+    labels.push(d.getDate()+'');
+    const ents=getEntriesForHabitDay(h.id,ds);
+    if(h.type==='bool') data.push(ents.length>0?1:0);
+    else data.push(ents.reduce((s,e)=>s+(e.value||0),0));
+    colors.push(ents.length>0?color+'cc':'var(--bg3)');
+  }
+  new Chart(ctx,{type:'bar',data:{labels,datasets:[{data,backgroundColor:colors,borderRadius:4,borderSkipped:false}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${ctx.raw} ${TYPE_UNITS[h.type]}`}}},scales:{x:{grid:{display:false},ticks:{font:{size:10},maxTicksLimit:15}},y:{grid:{color:'rgba(0,0,0,0.05)'},ticks:{font:{size:11}},beginAtZero:true}}}});
+}
+
+function drawWeekChart(h){
+  const ctx=document.getElementById('weekChart');
+  if(!ctx)return;
+  const color=getHabitColor(h);
+  const labels=[],data=[];
+  for(let w=7;w>=0;w--){
+    let sum=0,daysWithEntry=0;
+    for(let d=0;d<7;d++){
+      const dt=new Date();dt.setDate(dt.getDate()-(w*7+d));
+      const ds=fmtDate(dt);
+      const ents=getEntriesForHabitDay(h.id,ds);
+      if(h.type==='bool'){if(ents.length>0)daysWithEntry++}
+      else sum+=ents.reduce((s,e)=>s+(e.value||0),0);
+    }
+    const weekStart=new Date();weekStart.setDate(weekStart.getDate()-w*7-6);
+    labels.push(`${weekStart.getDate()}.${weekStart.getMonth()+1}`);
+    data.push(h.type==='bool'?daysWithEntry:sum);
+  }
+  new Chart(ctx,{type:'line',data:{labels,datasets:[{data,borderColor:color,backgroundColor:color+'22',fill:true,tension:.4,pointRadius:4,pointBackgroundColor:color}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:11}}},y:{grid:{color:'rgba(0,0,0,0.05)'},ticks:{font:{size:11}},beginAtZero:true}}}});
+}
+
+// ---- Actions ----
+function showView(v){
+  state.activeView=v;
+  document.querySelectorAll('.nav-btn').forEach((b,i)=>{
+    b.classList.toggle('active',['today','calendar','stats'][i]===v);
+  });
+  render();
+}
+
+function setFilter(catId){state.filterCat=catId;render()}
+function selectHabit(id){state.selectedHabitId=id||null;save();render()}
+function changeMonth(dir){
+  state.calMonth+=dir;
+  if(state.calMonth>11){state.calMonth=0;state.calYear++}
+  if(state.calMonth<0){state.calMonth=11;state.calYear--}
+  render();
+}
+
+function quickCheck(hid){
+  const today=todayStr();
+  const h=getHabit(hid);
+  if(!h)return;
+  if(h.type==='bool'){
+    const existing=getEntriesForHabitDay(hid,today);
+    if(existing.length>0){
+      state.entries=state.entries.filter(e=>!(e.habitId===hid&&e.date===today));
+    } else {
+      state.entries.push({id:uid(),habitId:hid,date:today,value:null,comment:''});
+    }
+    save();render();
+  } else {
+    openDay(today,hid);
+  }
+}
+
+// ---- Modals ----
+function closeModal(){document.getElementById('modal-root').innerHTML=''}
+function esc(s){return s?s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'):''}
+
+function openAddCategory(){openAddCategoryInline()}
+
+function pickColor(c,gridId){
+  document.querySelectorAll(`#${gridId} .color-swatch`).forEach(el=>{el.classList.toggle('active',el.dataset.color===c)});
+}
+
+function openAddHabit(){
+  const mr=document.getElementById('modal-root');
+  mr.innerHTML=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-header"><span class="modal-title">Новая привычка</span><button class="modal-close" onclick="closeModal()">✕</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Название</label><input class="form-input" id="hi-name" placeholder="Например: Пробежка"></div>
+      <div class="form-group"><label class="form-label">Категория</label>
+        <select class="form-select" id="hi-cat">
+          <option value="">Без категории</option>
+          ${state.categories.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Тип</label>
+        <div class="type-grid">
+          <div class="type-btn active" onclick="pickType(this,'bool')" data-type="bool">Да / нет</div>
+          <div class="type-btn" onclick="pickType(this,'count')" data-type="count">Количество</div>
+          <div class="type-btn" onclick="pickType(this,'measure')" data-type="measure">Измеримое</div>
+        </div>
+      </div>
+      <button class="btn-primary" onclick="saveHabit()">Добавить</button>
+    </div>
+  </div></div>`;
+}
+
+function pickType(el){
+  document.querySelectorAll('.type-btn').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function saveHabit(){
+  const name=document.getElementById('hi-name').value.trim();
+  if(!name)return;
+  const catId=document.getElementById('hi-cat').value||null;
+  const typeEl=document.querySelector('.type-btn.active');
+  const type=typeEl?typeEl.dataset.type:'bool';
+  const h={id:uid(),name,catId,type};
+  state.habits.push(h);
+  state.selectedHabitId=h.id;
+  save();closeModal();render();
+}
+
+function openDay(dateStr,forceHabitId){
+  const hid=forceHabitId||state.selectedHabitId;
+  const h=hid?getHabit(hid):null;
+  const mr=document.getElementById('modal-root');
+  const parts=dateStr.split('-');
+  const months=['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+  const dateLabel=`${parseInt(parts[2])} ${months[parseInt(parts[1])-1]} ${parts[0]}`;
+
+  // Habit selector if none selected
+  let habitSelectHtml='';
+  if(!h){
+    habitSelectHtml=`<div class="form-group"><label class="form-label">Привычка</label>
+      <select class="form-select" id="day-habit-sel">
+        <option value="">Выберите привычку</option>
+        ${state.habits.map(hh=>`<option value="${hh.id}">${esc(hh.name)}</option>`).join('')}
+      </select></div>`;
+  }
+
+  mr.innerHTML=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-header"><span class="modal-title">${dateLabel}</span><button class="modal-close" onclick="closeModal()">✕</button></div>
+    <div class="modal-body">
+      ${h?`<div style="font-weight:600;color:${getHabitColor(h)};margin-bottom:16px">${esc(h.name)}</div>`:''}
+      ${habitSelectHtml}
+      ${h?renderDayEntries(hid,dateStr):''}
+      <div id="day-entries-list"></div>
+      <div style="border-top:1px solid var(--border2);padding-top:16px;margin-top:8px">
+        <div class="card-title">Добавить отметку</div>
+        ${h&&h.type!=='bool'?`<div class="form-group"><label class="form-label">Значение</label><input type="number" class="form-input" id="e-val" placeholder="0" step="0.1"></div>`:''}
+        <div class="form-group"><label class="form-label">Комментарий</label><textarea class="form-input" id="e-comment" rows="2" placeholder="Необязательно..."></textarea></div>
+        <button class="btn-primary" onclick="addEntry('${dateStr}')">Сохранить</button>
+      </div>
+    </div>
+  </div></div>`;
+}
+
+function renderDayEntries(hid,dateStr){
+  const h=getHabit(hid);
+  const entries=getEntriesForHabitDay(hid,dateStr);
+  if(!entries.length) return `<div style="color:var(--text3);font-size:13px;margin-bottom:16px">Нет отметок за этот день</div>`;
+  let html=`<div style="margin-bottom:16px">`;
+  entries.forEach(e=>{
+    html+=`<div class="day-entry">
+      <div class="day-entry-top">
+        ${h.type!=='bool'&&e.value!=null?`<span class="day-entry-val">${e.value} ${TYPE_UNITS[h.type]}</span>`:'<span class="day-entry-val" style="color:var(--green)">✓</span>'}
+        <span class="day-entry-time" style="flex:1"></span>
+        <div class="day-entry-actions">
+          <button class="icon-btn" onclick="editEntry('${e.id}','${dateStr}')" title="Редактировать">✎</button>
+          <button class="icon-btn" style="color:var(--red)" onclick="deleteEntry('${e.id}','${dateStr}')" title="Удалить">✕</button>
+        </div>
+      </div>
+      ${e.comment?`<div class="day-entry-comment">${esc(e.comment)}</div>`:''}
+    </div>`;
+  });
+  html+=`</div>`;
+  return html;
+}
+
+function addEntry(dateStr){
+  let hid=state.selectedHabitId;
+  const sel=document.getElementById('day-habit-sel');
+  if(sel) hid=sel.value;
+  if(!hid)return;
+  const h=getHabit(hid);
+  const valEl=document.getElementById('e-val');
+  const val=valEl?parseFloat(valEl.value)||null:null;
+  const comment=(document.getElementById('e-comment').value||'').trim();
+  state.entries.push({id:uid(),habitId:hid,date:dateStr,value:val,comment});
+  state.selectedHabitId=hid;
+  save();
+  openDay(dateStr,hid);
+  render();
+}
+
+function deleteEntry(eid,dateStr){
+  state.entries=state.entries.filter(e=>e.id!==eid);
+  save();
+  openDay(dateStr,state.selectedHabitId);
+  render();
+}
+
+function editEntry(eid,dateStr){
+  const e=state.entries.find(x=>x.id===eid);
+  if(!e)return;
+  const h=getHabit(e.habitId);
+  const mr=document.getElementById('modal-root');
+  mr.innerHTML=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-header"><span class="modal-title">Редактировать</span><button class="modal-close" onclick="closeModal()">✕</button></div>
+    <div class="modal-body">
+      <div style="font-weight:600;color:${getHabitColor(h)};margin-bottom:16px">${esc(h.name)}</div>
+      ${h.type!=='bool'?`<div class="form-group"><label class="form-label">Значение</label><input type="number" class="form-input" id="edit-val" value="${e.value||''}" step="0.1"></div>`:''}
+      <div class="form-group"><label class="form-label">Комментарий</label><textarea class="form-input" id="edit-comment" rows="3">${esc(e.comment||'')}</textarea></div>
+      <button class="btn-primary" onclick="saveEditEntry('${eid}','${dateStr}')">Сохранить</button>
+      <button class="btn-secondary" onclick="openDay('${dateStr}')">Назад</button>
+    </div>
+  </div></div>`;
+}
+
+function saveEditEntry(eid,dateStr){
+  const e=state.entries.find(x=>x.id===eid);
+  if(!e)return;
+  const valEl=document.getElementById('edit-val');
+  if(valEl) e.value=parseFloat(valEl.value)||null;
+  e.comment=document.getElementById('edit-comment').value.trim();
+  save();openDay(dateStr,e.habitId);render();
+}
+
+// ---- Edit Categories ----
+function openEditCategories(){
+  const mr=document.getElementById('modal-root');
+  mr.innerHTML=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-header"><span class="modal-title">Категории</span><button class="modal-close" onclick="closeModal()">✕</button></div>
+    <div class="modal-body" id="cat-editor-body">
+      ${renderCatEditorRows()}
+      <button class="btn-secondary" style="margin-top:8px" onclick="openAddCategoryInline()">+ Добавить категорию</button>
+    </div>
+  </div></div>`;
+}
+
+function renderCatEditorRows(){
+  if(!state.categories.length) return `<div style="color:var(--text3);font-size:13px;margin-bottom:12px">Нет категорий</div>`;
+  return state.categories.map(c=>{
+    const cnt=state.habits.filter(h=>h.catId===c.id).length;
+    return `<div class="day-entry" style="margin-bottom:8px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="cat-dot" style="background:${c.color};width:12px;height:12px;flex-shrink:0"></div>
+        <span style="flex:1;font-size:14px;font-weight:500">${esc(c.name)}</span>
+        <span style="font-size:12px;color:var(--text3)">${cnt} привычек</span>
+        <button class="icon-btn" onclick="openEditOneCategory('${c.id}')" title="Изменить">✎</button>
+        <button class="icon-btn" style="color:var(--red)" onclick="deleteCategoryPrompt('${c.id}')" title="Удалить">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openEditOneCategory(cid){
+  const c=getCat(cid);if(!c)return;
+  const mr=document.getElementById('modal-root');
+  mr.innerHTML=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-header"><span class="modal-title">Изменить категорию</span><button class="modal-close" onclick="openEditCategories()">✕</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Название</label><input class="form-input" id="ec-name" value="${esc(c.name)}"></div>
+      <div class="form-group"><label class="form-label">Цвет</label>
+        <div class="color-grid" id="ec-colors">
+          ${COLORS.map(col=>`<div class="color-swatch ${col===c.color?'active':''}" style="background:${col}" onclick="pickColor('${col}','ec-colors')" data-color="${col}"></div>`).join('')}
+        </div>
+      </div>
+      <button class="btn-primary" onclick="saveEditCategory('${cid}')">Сохранить</button>
+      <button class="btn-secondary" onclick="openEditCategories()">Назад</button>
+    </div>
+  </div></div>`;
+}
+
+function saveEditCategory(cid){
+  const c=getCat(cid);if(!c)return;
+  const name=document.getElementById('ec-name').value.trim();
+  if(!name)return;
+  const active=document.querySelector('#ec-colors .active');
+  c.name=name;
+  if(active) c.color=active.dataset.color;
+  save();openEditCategories();render();
+}
+
+function deleteCategoryPrompt(cid){
+  const c=getCat(cid);if(!c)return;
+  const cnt=state.habits.filter(h=>h.catId===cid).length;
+  const mr=document.getElementById('modal-root');
+  mr.innerHTML=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-header"><span class="modal-title">Удалить категорию?</span><button class="modal-close" onclick="openEditCategories()">✕</button></div>
+    <div class="modal-body">
+      <p style="font-size:15px;margin-bottom:8px">«${esc(c.name)}»</p>
+      ${cnt>0?`<p style="font-size:13px;color:var(--text2);margin-bottom:16px">${cnt} привычек останутся без категории.</p>`:`<p style="font-size:13px;color:var(--text3);margin-bottom:16px">Привычек в этой категории нет.</p>`}
+      <button class="btn-primary" style="background:var(--red)" onclick="deleteCategory('${cid}')">Удалить</button>
+      <button class="btn-secondary" onclick="openEditCategories()">Отмена</button>
+    </div>
+  </div></div>`;
+}
+
+function deleteCategory(cid){
+  state.categories=state.categories.filter(c=>c.id!==cid);
+  state.habits.forEach(h=>{if(h.catId===cid)h.catId=null});
+  if(state.filterCat===cid) state.filterCat='all';
+  save();openEditCategories();render();
+}
+
+function openAddCategoryInline(){
+  const mr=document.getElementById('modal-root');
+  let selColor=COLORS[state.categories.length%COLORS.length];
+  mr.innerHTML=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-header"><span class="modal-title">Новая категория</span><button class="modal-close" onclick="openEditCategories()">✕</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Название</label><input class="form-input" id="ci-name" placeholder="Здоровье, Спорт..."></div>
+      <div class="form-group"><label class="form-label">Цвет</label>
+        <div class="color-grid" id="ci-colors">
+          ${COLORS.map(c=>`<div class="color-swatch ${c===selColor?'active':''}" style="background:${c}" onclick="pickColor('${c}','ci-colors')" data-color="${c}"></div>`).join('')}
+        </div>
+      </div>
+      <button class="btn-primary" onclick="saveCategoryAndBack()">Добавить</button>
+      <button class="btn-secondary" onclick="openEditCategories()">Назад</button>
+    </div>
+  </div></div>`;
+}
+
+function saveCategoryAndBack(){
+  const name=document.getElementById('ci-name').value.trim();
+  if(!name)return;
+  const active=document.querySelector('#ci-colors .active');
+  const color=active?active.dataset.color:COLORS[0];
+  state.categories.push({id:uid(),name,color});
+  save();openEditCategories();render();
+}
+
+// ---- Clear All Data ----
+function confirmClearAll(){
+  const mr=document.getElementById('modal-root');
+  mr.innerHTML=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-header"><span class="modal-title">Очистить все данные?</span><button class="modal-close" onclick="closeModal()">✕</button></div>
+    <div class="modal-body">
+      <p style="font-size:15px;margin-bottom:6px">Это удалит все привычки, категории и отметки.</p>
+      <p style="font-size:13px;color:var(--text2);margin-bottom:20px">Действие нельзя отменить.</p>
+      <button class="btn-primary" style="background:var(--red)" onclick="clearAllData()">Да, удалить всё</button>
+      <button class="btn-secondary" onclick="closeModal()">Отмена</button>
+    </div>
+  </div></div>`;
+}
+
+function clearAllData(){
+  state.habits=[];state.categories=[];state.entries=[];
+  state.selectedHabitId=null;state.filterCat='all';
+  save();closeModal();render();
+}
+
+// ---- Export Excel ----
+function exportExcel(){
+  let csv='\uFEFF'; // BOM for Excel
+  csv+='Привычка,Категория,Тип,Дата,Значение,Комментарий\n';
+  state.entries.forEach(e=>{
+    const h=getHabit(e.habitId);if(!h)return;
+    const cat=getCat(h.catId);
+    csv+=`"${h.name}","${cat?cat.name:''}","${TYPE_LABELS[h.type]}","${e.date}","${e.value!=null?e.value:''}","${(e.comment||'').replace(/"/g,'""')}"\n`;
+  });
+  // Summary sheet as separate section
+  csv+='\n\nСводка\nПривычка,Категория,Отметок всего,Дней в этом месяце\n';
+  const today=new Date();
+  state.habits.forEach(h=>{
+    const cat=getCat(h.catId);
+    const total=state.entries.filter(e=>e.habitId===h.id).length;
+    let days=0;
+    const dim=new Date(today.getFullYear(),today.getMonth()+1,0).getDate();
+    for(let d=1;d<=dim;d++){
+      const ds=`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      if(isDone(h.id,ds))days++;
+    }
+    csv+=`"${h.name}","${cat?cat.name:''}",${total},${days}\n`;
+  });
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='habits.csv';a.click();
+}
+
+// ---- Init ----
+load();render();
+</script>
+</body>
+</html>
